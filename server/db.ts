@@ -1,14 +1,15 @@
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/neon-http";
+import { neon } from "@neondatabase/serverless";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
-// Sincrono/Direto se DATABASE_URL estiver presente
 if (process.env.DATABASE_URL) {
   try {
-    _db = drizzle(process.env.DATABASE_URL);
+    const sql = neon(process.env.DATABASE_URL);
+    _db = drizzle(sql);
   } catch (error) {
     console.warn("[Database] Failed to connect:", error);
     _db = null;
@@ -71,7 +72,9 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await database.insert(users).values(values).onDuplicateKeyUpdate({
+    // Sintaxe do Postgres para Upsert (ON CONFLICT DO UPDATE)
+    await database.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
       set: updateSet,
     });
   } catch (error) {
@@ -91,3 +94,4 @@ export async function getUserByOpenId(openId: string) {
 
   return result.length > 0 ? result[0] : undefined;
 }
+
